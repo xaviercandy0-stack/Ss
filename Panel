@@ -1,0 +1,697 @@
+--=====================================================================
+--  ███  N M O D S   P R O X Y  ███   v2.0
+--  Target : FREE FIRE MAX ZONE  (99610146753435)
+--=====================================================================
+
+if getgenv and getgenv().NMODS_PROXY then
+    pcall(function() getgenv().NMODS_PROXY.Destroy() end)
+    task.wait(0.2)
+end
+
+local Players      = game:GetService("Players")
+local RS           = game:GetService("ReplicatedStorage")
+local RF           = game:GetService("ReplicatedFirst")
+local RunService   = game:GetService("RunService")
+local UIS          = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Lighting     = game:GetService("Lighting")
+local VirtualUser  = game:GetService("VirtualUser")
+
+local LP = Players.LocalPlayer
+while not LP do task.wait(0.1); LP = Players.LocalPlayer end
+
+local PlayerGui
+repeat PlayerGui = LP:FindFirstChildOfClass("PlayerGui"); task.wait(0.1) until PlayerGui
+
+local unpackFn      = table.unpack or unpack
+local packFn        = table.pack or function(...) return { n = select("#", ...), ... } end
+local newcclosureFn = newcclosure or function(f) return f end
+local TI            = TweenInfo.new
+local typeof        = typeof or type
+
+--=====================================================================
+--  ESTADO
+--=====================================================================
+local State = {
+    stealth = true, useFuncs = false,
+    fly = false, creepyKill = false, invis = false,
+    magic = false, autoShoot = false, toolMode = true,
+    esp = false, names = false, aimbot = false, bright = false,
+    infJump = false, antiFall = false, antiAfk = false,
+    fpsBoost = false, autoRespawn = false,
+    speed = 60, walkSpeed = 16, jumpPower = 50, fps = 0,
+}
+
+local Connections = {}
+local Highlights  = {}
+local spawnedAt   = os.clock()
+local calibrating = false
+
+local function bind(sig, fn)
+    local c = sig:Connect(fn); table.insert(Connections, c); return c
+end
+
+--=====================================================================
+--  TEMA / HELPERS
+--=====================================================================
+local THEME = {
+    bg = Color3.fromRGB(12,12,16), panel = Color3.fromRGB(20,20,26),
+    row = Color3.fromRGB(27,27,35), accent = Color3.fromRGB(255,106,0),
+    accent2 = Color3.fromRGB(255,0,90), text = Color3.fromRGB(240,240,246),
+    dim = Color3.fromRGB(145,145,160), on = Color3.fromRGB(0,214,140),
+    off = Color3.fromRGB(58,58,70),
+}
+
+local function corner(i, r)
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,r); c.Parent = i; return c
+end
+local function stroke(i, col, th, tr)
+    local s = Instance.new("UIStroke"); s.Color = col; s.Thickness = th or 1
+    s.Transparency = tr or 0; s.Parent = i; return s
+end
+local function gradient(i, c1, c2, rot)
+    local g = Instance.new("UIGradient"); g.Color = ColorSequence.new(c1,c2)
+    g.Rotation = rot or 0; g.Parent = i; return g
+end
+local function padding(i, n)
+    local p = Instance.new("UIPadding")
+    p.PaddingLeft = UDim.new(0,n); p.PaddingRight = UDim.new(0,n)
+    p.PaddingTop = UDim.new(0,n); p.PaddingBottom = UDim.new(0,n); p.Parent = i
+end
+local function newGui(name, order)
+    local g = Instance.new("ScreenGui")
+    g.Name = name; g.ResetOnSpawn = false; g.IgnoreGuiInset = true
+    g.DisplayOrder = order; g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    g.Parent = PlayerGui; return g
+end
+
+--=====================================================================
+--  CARGA
+--=====================================================================
+local loadGui = newGui("NMODS_Loading", 500)
+local loadBg = Instance.new("Frame")
+loadBg.Size = UDim2.fromScale(1,1)
+loadBg.BackgroundColor3 = Color3.fromRGB(6,6,9)
+loadBg.BorderSizePixel = 0
+loadBg.Parent = loadGui
+gradient(loadBg, THEME.accent, Color3.fromRGB(6,6,9), 45)
+
+local loadBox = Instance.new("Frame")
+loadBox.AnchorPoint = Vector2.new(0.5,0.5)
+loadBox.Position = UDim2.fromScale(0.5,0.5)
+loadBox.Size = UDim2.fromOffset(300,170)
+loadBox.BackgroundTransparency = 1
+loadBox.Parent = loadBg
+
+local logo = Instance.new("TextLabel")
+logo.Size = UDim2.new(1,0,0,44)
+logo.BackgroundTransparency = 1
+logo.Font = Enum.Font.GothamBlack
+logo.Text = "NMODS PROXY"
+logo.TextSize = 33
+logo.TextColor3 = Color3.new(1,1,1)
+logo.Parent = loadBox
+local logoGrad = gradient(logo, THEME.accent, THEME.accent2, 0)
+
+local sub = Instance.new("TextLabel")
+sub.Position = UDim2.fromOffset(0,44)
+sub.Size = UDim2.new(1,0,0,18)
+sub.BackgroundTransparency = 1
+sub.Font = Enum.Font.GothamMedium
+sub.Text = "v2.0  ·  CAPTURA DE DISPARO REAL"
+sub.TextSize = 11
+sub.TextColor3 = THEME.dim
+sub.Parent = loadBox
+
+local barBg = Instance.new("Frame")
+barBg.Position = UDim2.fromOffset(0,90)
+barBg.Size = UDim2.new(1,0,0,7)
+barBg.BackgroundColor3 = Color3.fromRGB(32,32,40)
+barBg.BorderSizePixel = 0
+barBg.Parent = loadBox
+corner(barBg, 4)
+
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.new(0,0,1,0)
+barFill.BackgroundColor3 = THEME.accent
+barFill.BorderSizePixel = 0
+barFill.Parent = barBg
+corner(barFill, 4)
+
+local status = Instance.new("TextLabel")
+status.Position = UDim2.fromOffset(0,106)
+status.Size = UDim2.new(1,0,0,18)
+status.BackgroundTransparency = 1
+status.Font = Enum.Font.Gotham
+status.Text = "Iniciando..."
+status.TextSize = 11
+status.TextColor3 = THEME.dim
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Parent = loadBox
+
+local function setProgress(p, txt)
+    TweenService:Create(barFill, TI(0.25), { Size = UDim2.fromScale(p,1) }):Play()
+    if txt then status.Text = txt end
+end
+
+task.spawn(function()
+    while loadGui.Parent do
+        logoGrad.Rotation = (logoGrad.Rotation + 3) % 360
+        task.wait(0.03)
+    end
+end)
+
+--=====================================================================
+--  ESCANEO DE REMOTES
+--=====================================================================
+local ALL = {}        -- todos los remotes del juego
+local learned = nil   -- { remote, args, score }
+local replaying = false
+
+local function collect()
+    local out, seen = {}, {}
+    local roots = { RS, RF, workspace }
+    for _, plr in ipairs(Players:GetPlayers()) do
+        local ps = plr:FindFirstChild("PlayerScripts")
+        if ps then table.insert(roots, ps) end
+    end
+    for _, root in ipairs(roots) do
+        local ok = pcall(function()
+            for _, o in ipairs(root:GetDescendants()) do
+                if (o:IsA("RemoteEvent") or o:IsA("RemoteFunction")) and not seen[o] then
+                    seen[o] = true
+                    table.insert(out, o)
+                end
+            end
+        end)
+    end
+    ALL = out
+    return #out
+end
+
+local function pathOf(o)
+    local ok, p = pcall(function() return o:GetFullName() end)
+    return ok and p or "?"
+end
+
+local function fire(remote, args)
+    pcall(function()
+        if remote:IsA("RemoteEvent") then
+            remote:FireServer(unpackFn(args, 1, args.n or #args))
+        elseif State.useFuncs then
+            task.spawn(function() remote:InvokeServer(unpackFn(args, 1, args.n or #args)) end)
+        end
+    end)
+end
+
+--=====================================================================
+--  ENEMIGOS
+--=====================================================================
+local enemyCd = {}
+
+local function getEnemies()
+    local list, seen = {}, {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP and plr.Character then
+            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hum and root and hum.Health > 0 then
+                seen[plr.Character] = true
+                table.insert(list, { char = plr.Character, hum = hum, root = root, player = plr })
+            end
+        end
+    end
+    for _, m in ipairs(workspace:GetChildren()) do
+        if m:IsA("Model") and not seen[m] and m ~= LP.Character and not Players:GetPlayerFromCharacter(m) then
+            local hum = m:FindFirstChildOfClass("Humanoid")
+            local root = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart
+            if hum and root and hum.Health > 0 then
+                table.insert(list, { char = m, hum = hum, root = root })
+            end
+        end
+    end
+    return list
+end
+
+local function canHit(e)
+    local t = enemyCd[e.char]
+    local cd = State.stealth and 0.28 or 0.14
+    if t and os.clock() - t < cd then return false end
+    enemyCd[e.char] = os.clock()
+    return true
+end
+
+--=====================================================================
+--  MAPEO DE ARGUMENTOS
+--=====================================================================
+local function mapArgs(src, enemy)
+    local out = packFn()
+    for i = 1, (src.n or #src) do
+        local v = src[i]
+        local t = typeof(v)
+        if t == "Instance" then
+            if v:IsA("Player") then
+                out[i] = enemy.player or v
+            elseif v:IsA("Humanoid") then
+                out[i] = enemy.hum
+            elseif v:IsA("BasePart") then
+                out[i] = enemy.root
+            elseif v:IsA("Model") then
+                out[i] = enemy.char
+            else
+                out[i] = v
+            end
+        elseif t == "Vector3" then
+            out[i] = enemy.root.Position
+        elseif t == "CFrame" then
+            out[i] = CFrame.new(enemy.root.Position)
+        else
+            out[i] = v
+        end
+    end
+    return out
+end
+
+local function replayAt(enemy)
+    if not learned then return end
+    local args = mapArgs(learned.args, enemy)
+    replaying = true
+    fire(learned.remote, args)
+    replaying = false
+end
+
+--=====================================================================
+--  HOOK: APRENDE EL DISPARO REAL
+--=====================================================================
+local SHOTK = { "shoot", "fire", "attack", "hit", "bullet", "damage", "dmg" }
+
+local function scoreArgs(args)
+    local s = 0
+    for i = 1, (args.n or #args) do
+        local t = typeof(args[i])
+        if t == "Instance" then s += 3
+        elseif t == "Vector3" or t == "CFrame" then s += 2
+        elseif t == "number" then s += 1 end
+    end
+    return s
+end
+
+local function installHook()
+    if not hookmetamethod or not getrawmetatable then return end
+    pcall(function()
+        local mt = getrawmetatable(game)
+        local old = mt.__namecall
+        setreadonly(mt, false)
+        mt.__namecall = newcclosureFn(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "FireServer" and not replaying
+                and typeof(self) == "Instance" and self:IsA("RemoteEvent") then
+                local n = self.Name:lower()
+                for _, k in ipairs(SHOTK) do
+                    if n:find(k, 1, true) then
+                        local args = packFn(...)
+                        local sc = scoreArgs(args)
+                        if sc >= 2 and (not learned or sc > learned.score) then
+                            learned = { remote = self, args = args, score = sc }
+                            if toast then
+                                toast("Disparo capturado · " .. self.Name)
+                            end
+                        end
+                        break
+                    end
+                end
+                if State.magic and learned and os.clock() - (lastShot or 0) > (State.stealth and 0.3 or 0.12) then
+                    lastShot = os.clock()
+                    task.spawn(function()
+                        for _, e in ipairs(getEnemies()) do
+                            if canHit(e) then replayAt(e) end
+                        end
+                    end)
+                end
+            end
+            return old(self, ...)
+        end)
+        setreadonly(mt, true)
+    end)
+end
+local lastShot = 0
+
+--=====================================================================
+--  MODO ARMA (fallback)
+--=====================================================================
+local function getGun()
+    local char = LP.Character
+    if not char then return nil end
+    for _, c in ipairs(char:GetChildren()) do
+        if c:IsA("Tool") then return c end
+    end
+    return nil
+end
+
+local function equipGun()
+    local g = getGun()
+    if g then return g end
+    local bp = LP:FindFirstChild("Backpack")
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if bp and hum then
+        for _, c in ipairs(bp:GetChildren()) do
+            if c:IsA("Tool") then
+                pcall(function() hum:EquipTool(c) end)
+                return c
+            end
+        end
+    end
+    return nil
+end
+
+local function toolFireAt(enemy)
+    local gun = getGun() or equipGun()
+    if not gun then return end
+    local cam = workspace.CurrentCamera
+    cam.CFrame = CFrame.lookAt(cam.CFrame.Position, enemy.root.Position)
+    pcall(function() gun:Activate() end)
+end
+
+--=====================================================================
+--  RÁFAGA
+--=====================================================================
+local function burst(n)
+    if calibrating then return end
+    local enemies = getEnemies()
+    if #enemies == 0 then return end
+
+    if learned then
+        for _, e in ipairs(enemies) do
+            if canHit(e) then replayAt(e) end
+        end
+    elseif State.toolMode then
+        local e = enemies[1]
+        if e then toolFireAt(e) end
+    end
+end
+
+--=====================================================================
+--  CALIBRACIÓN POR FUERZA BRUTA
+--=====================================================================
+local TEMPLATES = {
+    function(t) return packFn(t.char) end,
+    function(t) return packFn(t.hum) end,
+    function(t) return packFn(t.root.Position, 100) end,
+    function(t) return packFn(t.char, 100) end,
+    function(t) return packFn(t.hum, 100) end,
+    function(t) return packFn(t.root) end,
+}
+
+local function bruteForce()
+    if calibrating then return end
+    if #ALL == 0 then collect() end
+    if #ALL == 0 then toast("No hay remotes"); return end
+
+    calibrating = true
+    toast("Probando " .. #ALL .. " remotes...")
+    local found = 0
+    local maxR = math.min(#ALL, 60)
+
+    for i = 1, maxR do
+        local remote = ALL[i]
+        local list = getEnemies()
+        local target = list[1]
+        if not target then break end
+
+        for ti = 1, #TEMPLATES do
+            local hp0 = target.hum.Health
+            fire(remote, TEMPLATES[ti](target))
+            task.wait(0.15)
+            if target.hum.Health < hp0 or target.hum.Health <= 0 then
+                local args = TEMPLATES[ti](target)
+                learned = { remote = remote, args = args, score = 99 }
+                found += 1
+                toast("✔ " .. remote.Name .. " (plantilla " .. ti .. ")")
+                break
+            end
+        end
+        if found > 0 then break end
+    end
+
+    calibrating = false
+    if found == 0 then toast("Nada funcionó · usa arma o revisa VOLCAR")
+end
+
+--=====================================================================
+--  VUELO
+--=====================================================================
+local flyBV, flyVel = nil, Vector3.zero
+
+local function stopFly()
+    if flyBV then pcall(function() flyBV:Destroy() end); flyBV = nil end
+    flyVel = Vector3.zero
+    local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+    if h then pcall(function() h:ChangeState(Enum.HumanoidStateType.Freefall) end) end
+end
+
+local function startFly()
+    local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    stopFly()
+    flyBV = Instance.new("BodyVelocity")
+    flyBV.MaxForce = Vector3.new(8e4,8e4,8e4)
+    flyBV.Velocity = Vector3.zero
+    flyBV.Parent = hrp
+end
+
+bind(RunService.RenderStepped, function()
+    if not State.fly then return end
+    local char = LP.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+    if not flyBV or flyBV.Parent ~= hrp then startFly(); if not flyBV then return end end
+    local cam = workspace.CurrentCamera
+    local md = hum.MoveDirection
+    local flat = Vector3.new(md.X, 0, md.Z)
+    local target = Vector3.zero
+    if flat.Magnitude > 0.05 then
+        target = flat.Unit * State.speed + Vector3.new(0, cam.CFrame.LookVector.Y * State.speed, 0)
+    end
+    flyVel = flyVel:Lerp(target, 0.14)
+    flyBV.Velocity = flyVel
+end)
+
+--=====================================================================
+--  INVISIBLE
+--=====================================================================
+local invisStore = {}
+local function applyInvis(on)
+    local char = LP.Character
+    if not char then return end
+    for _, d in ipairs(char:GetDescendants()) do
+        if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
+            if on then
+                if invisStore[d] == nil then invisStore[d] = d.Transparency end
+                d.Transparency = 1
+            elseif invisStore[d] ~= nil then
+                d.Transparency = invisStore[d]; invisStore[d] = nil
+            end
+        end
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.NameDisplayDistance = on and 0 or 100
+        hum.HealthDisplayDistance = on and 0 or 100
+    end
+end
+
+--=====================================================================
+--  ESP / AIM
+--=====================================================================
+local function clearESP()
+    for _, h in pairs(Highlights) do pcall(function() h:Destroy() end) end
+    Highlights = {}
+end
+
+local function refreshESP()
+    if not State.esp and not State.names then clearESP(); return end
+    local alive = {}
+    for _, e in ipairs(getEnemies()) do
+        alive[e.char] = true
+        if State.esp and (not Highlights[e.char] or not Highlights[e.char].Parent) then
+            local h = Instance.new("Highlight")
+            h.FillColor = THEME.accent2; h.FillTransparency = 0.6
+            h.OutlineColor = THEME.accent
+            h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            h.Adornee = e.char; h.Parent = e.char
+            Highlights[e.char] = h
+        end
+    end
+    for c, h in pairs(Highlights) do
+        if not alive[c] and h:IsA("Highlight") then
+            pcall(function() h:Destroy() end); Highlights[c] = nil
+        end
+    end
+end
+
+pcall(function()
+    RunService:BindToRenderStep("NMODS_AIM", Enum.RenderPriority.Camera.Value + 1, function(dt)
+        if not State.aimbot then return end
+        local cam = workspace.CurrentCamera
+        local best, bestD = nil, math.huge
+        local center = cam.ViewportSize / 2
+        for _, e in ipairs(getEnemies()) do
+            local sp, on = cam:WorldToViewportPoint(e.root.Position)
+            if on then
+                local d = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                if d < bestD then bestD = d; best = e end
+            end
+        end
+        if best then
+            cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(cam.CFrame.Position, best.root.Position), math.clamp(dt*10,0,1))
+        end
+    end)
+end)
+
+--=====================================================================
+--  LOOPS
+--=====================================================================
+task.spawn(function()
+    while true do
+        task.wait(State.stealth and 0.4 or 0.18)
+        if (State.creepyKill or State.autoShoot) and os.clock() - spawnedAt > 3 then
+            pcall(burst)
+        end
+    end
+end)
+
+task.spawn(function()
+    local t = 0
+    while true do
+        task.wait(0.5); t += 0.5
+        pcall(refreshESP)
+        if State.antiAfk and t % 45 == 0 then
+            pcall(function() VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end)
+        end
+    end
+end)
+
+--=====================================================================
+--  RESPAWN
+--=====================================================================
+local function onCharacter(char)
+    local hum = char:WaitForChild("Humanoid", 20)
+    if not hum then return end
+    invisStore = {}; enemyCd = {}; flyBV = nil; flyVel = Vector3.zero
+    spawnedAt = os.clock()
+    task.wait(0.4)
+    hum.WalkSpeed = State.walkSpeed
+    hum.UseJumpPower = true
+    hum.JumpPower = State.jumpPower
+    if State.fly then task.delay(0.6, startFly) end
+    if State.invis then task.delay(0.6, function() applyInvis(true) end) end
+    bind(hum.Died, function() stopFly(); clearESP() end)
+end
+bind(LP.CharacterAdded, onCharacter)
+if LP.Character then onCharacter(LP.Character) end
+
+--=====================================================================
+--  UI
+--=====================================================================
+local gui = newGui("NMODS_PROXY", 100)
+
+local bubble = Instance.new("TextButton")
+bubble.Size = UDim2.fromOffset(54,54)
+bubble.Position = UDim2.new(0,14,0.5,-27)
+bubble.BackgroundColor3 = THEME.accent
+bubble.Text = "N"; bubble.Font = Enum.Font.GothamBlack
+bubble.TextSize = 24; bubble.TextColor3 = Color3.new(1,1,1)
+bubble.AutoButtonColor = false; bubble.Visible = false; bubble.Parent = gui
+corner(bubble, 27)
+gradient(bubble, THEME.accent, THEME.accent2, 45)
+
+local window = Instance.new("Frame")
+window.Size = UDim2.fromOffset(310,440)
+window.Position = UDim2.new(0.5,-155,0.5,-220)
+window.BackgroundColor3 = THEME.panel
+window.BorderSizePixel = 0; window.ClipsDescendants = true; window.Parent = gui
+corner(window, 16)
+stroke(window, THEME.accent, 1.5, 0.45)
+local bgGrad = gradient(window, Color3.fromRGB(30,30,40), THEME.bg, 90)
+bgGrad.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,0.15) })
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1,0,0,46)
+titleBar.BackgroundColor3 = THEME.accent
+titleBar.BorderSizePixel = 0; titleBar.Parent = window
+gradient(titleBar, THEME.accent, THEME.accent2, 15)
+
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Position = UDim2.fromOffset(14,0)
+titleLbl.Size = UDim2.new(1,-90,1,0)
+titleLbl.BackgroundTransparency = 1
+titleLbl.Font = Enum.Font.GothamBlack
+titleLbl.Text = "NMODS PROXY"
+titleLbl.TextSize = 17; titleLbl.TextColor3 = Color3.new(1,1,1)
+titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+titleLbl.Parent = titleBar
+
+local function barBtn(txt, x)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.fromOffset(28,28)
+    b.Position = UDim2.new(1,x,0.5,-14)
+    b.BackgroundColor3 = Color3.new(1,1,1)
+    b.BackgroundTransparency = 0.82
+    b.Text = txt; b.Font = Enum.Font.GothamBold
+    b.TextSize = 15; b.TextColor3 = Color3.new(1,1,1)
+    b.AutoButtonColor = false; b.Parent = titleBar
+    corner(b, 8); return b
+end
+local minBtn = barBtn("–", -66)
+local closeBtn = barBtn("✕", -34)
+
+local dragging, dragStart, startPos
+titleBar.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStart = i.Position; startPos = window.Position
+        i.Changed:Connect(function()
+            if i.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+bind(UIS.InputChanged, function(i)
+    if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+        local d = i.Position - dragStart
+        window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+d.X, startPos.Y.Scale, startPos.Y.Offset+d.Y)
+    end
+end)
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Position = UDim2.fromOffset(0,46)
+scroll.Size = UDim2.new(1,0,1,-78)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 3
+scroll.ScrollBarImageColor3 = THEME.accent
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.Parent = window
+
+local listL = Instance.new("UIListLayout")
+listL.Padding = UDim.new(0,7)
+listL.SortOrder = Enum.SortOrder.LayoutOrder
+listL.Parent = scroll
+padding(scroll, 10)
+
+local function section(txt)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(1,0,0,24); f.BackgroundTransparency = 1; f.Parent = scroll
+    local l = Instance.new("TextLabel")
+    l.Position = UDim2.fromOffset(2,0)
+    l.Size = UDim2.fromScale(1,1); l.BackgroundTransparency = 1
+    l.Font = Enum.Font.GothamBold; l.Text = string.upper(txt)
+    l.TextSize = 10; l.TextColor3 = THEME.accent
+    l.TextXAlignment = Enum.TextXAlignment.Left; l.Parent = f
+end
+
+function toast(msg)
+    local t = Instance.new("TextLabel")
+    t.AnchorPoint = Vector2.new(0.5,1)
+    t.Position = UDim2.new(0.5,0,1,-64)
+    t.Size = UDim2.fromOffset(255,34
